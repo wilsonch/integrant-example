@@ -9,7 +9,9 @@
                  [io.pedestal/pedestal.jetty   "0.5.2"]
                  [org.slf4j/slf4j-simple       "1.7.25"]
                  [integrant "0.5.0"]
-                 [integrant/repl "0.2.0"]]
+                 [integrant/repl "0.2.0"]
+                 [clj-time "0.14.0"]
+                 [buddy/buddy-auth "1.4.1"]]
 
   :source-paths ["src"]
 
