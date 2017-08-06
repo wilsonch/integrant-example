@@ -1,13 +1,19 @@
 (ns integrant-example.routes
-  (:require [io.pedestal.http :as http]
+  (:require [clojure.data.json :as json]
+            [io.pedestal.http :as http]
             [io.pedestal.http.route :as route]
             [io.pedestal.http.body-params :as body-params]
+            [io.pedestal.http.content-negotiation :as content-neg]
             [io.pedestal.interceptor.chain :refer [terminate]]
+            [io.pedestal.interceptor.helpers :as interceptor]
             [io.pedestal.test :as test]
             [clj-time.core :refer [hours from-now]]
             [buddy.sign.jwt :as jwt]
             [buddy.auth.middleware :as middleware]
             [buddy.auth.backends.token :refer [jws-backend]]))
+
+(def supported-types ["text/html" "application/edn" "application/json" "text/plain"])
+(def content-neg-int (content-neg/negotiate-content supported-types))
 
 (def secret "secret-stuff")
 (def encryption {:alg :hs512})
@@ -22,8 +28,21 @@
 (def unauthorized (partial response 401 {:message "Unauthorized"}))
 (def forbidden (partial response 403 {:message "Not allowed"}))
 
-(defn on-enter [name handler]
-  {:name name :enter handler})
+(defn coerce-body
+  [context]
+  (let [accepted (get-in context [:request :accept :field] "text/plain")
+        response (get context :response)
+        body (get response :body)
+        coerced-body (case accepted
+                       "text/html" body
+                       "text/plain" body
+                       "application/edn" (pr-str body)
+                       "application/json" (json/write-str body))
+        updated-response (assoc response
+                           :headers {"Content-Type" accepted}
+                           :body coerced-body)]
+    (assoc context :response updated-response)))
+
 
 (defonce database (atom {:users [{:username "rich" :password "hickey"}]}))
 
@@ -59,12 +78,21 @@
           terminate
           (assoc :response (unauthorized))))))
 
+(def login-interceptors
+  [content-neg-int
+   (body-params/body-params)
+   (interceptor/around ::login login coerce-body)])
+
+(def protected-interceptors
+  [(interceptor/before ::check-auth check-auth)
+   (interceptor/before ::protected echo)])
+
 (def routes
   (route/expand-routes
-    #{["/login" :post [(body-params/body-params) (on-enter :login login)]]
-      ["/protected" :get [(on-enter ::check-auth check-auth) (on-enter :protected echo)]]}))
+    #{["/login" :post login-interceptors]
+      ["/protected" :get protected-interceptors]}))
 
 (comment
-  ; curl -X POST -H "Content-Type: application/json" -d '{"username":"rich", "password":"hickey"}' http://localhost:8888/login
+  ; curl -X POST -H "Content-Type: application/json" -H "Accept: application/json" -d '{"username":"rich", "password":"hickey"}' http://localhost:8888/login
   ; curl -H "Authorization: Token xxxx" localhost:8888/protected
   )
