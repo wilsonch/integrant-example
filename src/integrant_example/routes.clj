@@ -78,6 +78,20 @@
           terminate
           (assoc :response (unauthorized))))))
 
+
+(defn user-allowed? [{:keys [request] :as context}]
+  (let [{:keys [identity path-params]} request
+        user (:user identity)]
+    (= (:username user) (:some-param path-params))))
+
+(defn check-permissions [checker-fn]
+  (fn [{:keys [request] :as context}]
+    (if (checker-fn context)
+      context
+      (-> context
+          terminate
+          (assoc :response (forbidden))))))
+
 (def login-interceptors
   [content-neg-int
    (body-params/body-params)
@@ -85,14 +99,16 @@
 
 (def protected-interceptors
   [(interceptor/before ::check-auth check-auth)
+   (interceptor/before ::check-permissions (check-permissions user-allowed?))
    (interceptor/before ::protected echo)])
 
 (def routes
   (route/expand-routes
     #{["/login" :post login-interceptors]
-      ["/protected" :get protected-interceptors]}))
+      ["/protected/:some-param" :get protected-interceptors]}))
 
 (comment
   ; curl -X POST -H "Content-Type: application/json" -H "Accept: application/json" -d '{"username":"rich", "password":"hickey"}' http://localhost:8888/login
-  ; curl -H "Authorization: Token xxxx" localhost:8888/protected
+  ; curl -H "Authorization: Token xxxx" localhost:8888/protected/rich
+  ; curl -H "Authorization: Token eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7InVzZXJuYW1lIjoicmljaCJ9LCJleHAiOjE1MDIwMTc2NzJ9.0LJ2Vz5ZQc8xNYFYlFDLqWkPXn6Ub10D3p5EM6QA8gleDB5c9cQbvbTo_IeQYFOT3JoySqRlmLscIerLpkxicA" localhost:8888/protected/rich
   )
