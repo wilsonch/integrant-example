@@ -5,19 +5,23 @@
             [integrant-example.routes :as routes]
             [io.pedestal.http :as http]))
 
-(set-prep! (constantly
-             {::system/server {::http/routes (ig/ref ::system/routes)
-                               ::http/type   :jetty
-                               ::http/port   8888}
-              ::system/routes routes/routes}))
-
 ;; switch to dev ns
 ;; user=> (dev)
 ;;
+
+;; create a prep fn that returns a config map
+(set-prep! (constantly
+             {::system/server {::http/routes (ig/ref ::system/routes)
+                               ::http/type   :jetty
+                               ::http/port   8888
+                               ::http/join?  false
+                               :env          :dev}
+              ::system/routes routes/routes}))
+
 ;; loads the above config into integrant.repl.state/config
 ;; dev=> (prep)
 ;;
-;; initialise the system into integrant.repl.state/system
+;; turn the config into a running system stored in integrant.repl.state/system
 ;; dev=> (init)
 ;;
 ;; go = prep + init

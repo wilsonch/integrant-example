@@ -16,6 +16,6 @@
   :resource-paths ["resources"]
 
   :repl-options {:init-ns user
-                 :welcome (println "Type (dev) to load dev ns, then (go) to run system; (reset) to reload system")}
+                 :welcome (println "First type (dev) to load dev ns, then (go) to run system; (reset) to reload system")}
 
   :profiles {:dev {:source-paths ["dev"]}})
